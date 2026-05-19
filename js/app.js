@@ -36,7 +36,7 @@ class App {
     const hash = window.location.hash.slice(1);
     if (VIEWS[hash]) currentView = hash;
 
-    driveAuth.init(store.data.settings.clientId);
+    driveAuth.init();
 
     store.on('timerChange', () => this._updateTimerWidget());
     store.on('syncComplete', (type) => {
