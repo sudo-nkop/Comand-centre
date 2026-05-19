@@ -232,10 +232,12 @@ class Store {
       const token = auth.getToken();
 
       // Search for existing file
+      const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
       const search = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILE_NAME}' and trashed=false&spaces=drive&fields=files(id,name,modifiedTime)`,
+        `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      if (!search.ok) throw new Error(`Drive search failed: ${search.status}`);
       const { files } = await search.json();
 
       if (files && files.length > 0) {
@@ -244,6 +246,7 @@ class Store {
           `https://www.googleapis.com/drive/v3/files/${this.driveFileId}?alt=media`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        if (!res.ok) throw new Error(`Drive read failed: ${res.status}`);
         const remote = await res.json();
         // Merge: remote wins for entities (last-write-wins per item by updatedAt/createdAt)
         this._mergeData(remote);
@@ -291,10 +294,11 @@ class Store {
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify({ name: DRIVE_FILE_NAME })], { type: 'application/json' }));
         form.append('file', blob);
-        await fetch(
+        const updateRes = await fetch(
           `https://www.googleapis.com/upload/drive/v3/files/${this.driveFileId}?uploadType=multipart`,
           { method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: form }
         );
+        if (!updateRes.ok) throw new Error(`Drive update failed: ${updateRes.status}`);
       } else {
         // Create new
         const form = new FormData();
@@ -304,6 +308,7 @@ class Store {
           'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
           { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
         );
+        if (!res.ok) throw new Error(`Drive create failed: ${res.status}`);
         const json = await res.json();
         this.driveFileId = json.id;
       }
