@@ -62,15 +62,11 @@ class DriveAuth {
 
   // ── Sign-in flow ────────────────────────────────────────────────────────
   _startSignIn() {
-    const clientId = store.data.settings.clientId;
-    if (!clientId) {
-      this._showSetupModal(() => {
-        // Called after the user saves a client ID
-        this._startSignIn();
-      });
-      return;
-    }
-    this._redirectToGoogle(clientId);
+    // Always show the modal so the user can review/edit the Client ID before connecting
+    this._showSetupModal(() => {
+      const clientId = store.data.settings.clientId;
+      if (clientId) this._redirectToGoogle(clientId);
+    });
   }
 
   _redirectToGoogle(clientId) {
