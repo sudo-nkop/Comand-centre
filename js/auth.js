@@ -45,18 +45,25 @@ class DriveAuth {
 
   // ── OAuth callback ──────────────────────────────────────────────────────
   _handleOAuthCallback() {
-    // Google sends the token back in the URL hash after redirect
     const hash = window.location.hash;
-    if (!hash || !hash.includes('access_token')) return;
+    if (!hash) return;
 
     const params = new URLSearchParams(hash.replace(/^#/, ''));
+
+    // If Google returned an error, clear the bad client ID and show the modal
+    if (params.get('error')) {
+      history.replaceState(null, '', window.location.pathname);
+      store.setSetting('clientId', '');
+      showToast('Google auth failed — please check your Client ID', 'error');
+      return;
+    }
+
     const token     = params.get('access_token');
     const expiresIn = parseInt(params.get('expires_in') || '3600', 10);
     if (!token) return;
 
     // Remove token from URL so it doesn't linger in browser history
-    history.replaceState(null, '', window.location.pathname + window.location.search);
-
+    history.replaceState(null, '', window.location.pathname);
     this._saveToken(token, expiresIn);
   }
 
