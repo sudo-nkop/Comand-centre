@@ -1,5 +1,5 @@
 import { store } from '../store.js';
-import { formatDuration, formatRelative, escapeHtml } from '../utils.js';
+import { formatDuration, formatRelative, formatDate, escapeHtml } from '../utils.js';
 
 export function renderDashboard() {
   const { todos, goals, notes } = store.data;
@@ -88,7 +88,7 @@ export function renderDashboard() {
                 <span style="font-size:0.8rem;color:var(--accent-light);font-weight:600">${g.progress}%</span>
               </div>
               <div class="progress-bar"><div class="progress-fill" style="width:${g.progress}%"></div></div>
-              ${g.targetDate ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">Due ${formatRelative(g.targetDate)}</div>` : ''}
+              ${g.targetDate ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">Due ${formatDate(g.targetDate)}</div>` : ''}
             </div>
           `).join('')}
         </div>
