@@ -8,7 +8,7 @@ class Store {
     this.listeners = {};
     this.data = this._defaultData();
     this.driveFileId = null;
-    this.syncDebounced = debounce(() => this._syncToDrive(), 4000);
+    this.syncDebounced = debounce(() => this._syncToDrive().catch(e => console.warn('Background sync failed:', e)), 4000);
   }
 
   _defaultData() {
@@ -228,7 +228,10 @@ class Store {
   async syncFromDrive() {
     try {
       const auth = window._driveAuth;
-      if (!auth?.isConnected()) return;
+      if (!auth?.isConnected()) {
+        showToast('Drive token expired — please reconnect', 'error');
+        return;
+      }
       const token = auth.getToken();
 
       // Search for existing file
@@ -258,7 +261,7 @@ class Store {
       }
     } catch (e) {
       console.warn('Drive sync error:', e);
-      showToast('Drive sync failed', 'error');
+      showToast(`Drive sync failed: ${e.message}`, 'error');
     }
   }
 
@@ -282,40 +285,34 @@ class Store {
   }
 
   async _syncToDrive() {
-    try {
-      const auth = window._driveAuth;
-      if (!auth?.isConnected()) return;
-      const token = auth.getToken();
-      const body = JSON.stringify(this.data);
-      const blob = new Blob([body], { type: 'application/json' });
+    const auth = window._driveAuth;
+    if (!auth?.isConnected()) return;
+    const token = auth.getToken();
+    const body = JSON.stringify(this.data);
+    const blob = new Blob([body], { type: 'application/json' });
 
-      if (this.driveFileId) {
-        // Update existing
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify({ name: DRIVE_FILE_NAME })], { type: 'application/json' }));
-        form.append('file', blob);
-        const updateRes = await fetch(
-          `https://www.googleapis.com/upload/drive/v3/files/${this.driveFileId}?uploadType=multipart`,
-          { method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: form }
-        );
-        if (!updateRes.ok) throw new Error(`Drive update failed: ${updateRes.status}`);
-      } else {
-        // Create new
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify({ name: DRIVE_FILE_NAME, mimeType: 'application/json' })], { type: 'application/json' }));
-        form.append('file', blob);
-        const res = await fetch(
-          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-          { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
-        );
-        if (!res.ok) throw new Error(`Drive create failed: ${res.status}`);
-        const json = await res.json();
-        this.driveFileId = json.id;
-      }
-      this.emit('syncComplete', 'saved');
-    } catch (e) {
-      console.warn('Drive save error:', e);
+    if (this.driveFileId) {
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify({ name: DRIVE_FILE_NAME })], { type: 'application/json' }));
+      form.append('file', blob);
+      const updateRes = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${this.driveFileId}?uploadType=multipart`,
+        { method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: form }
+      );
+      if (!updateRes.ok) throw new Error(`Drive update failed: ${updateRes.status}`);
+    } else {
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify({ name: DRIVE_FILE_NAME, mimeType: 'application/json' })], { type: 'application/json' }));
+      form.append('file', blob);
+      const res = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
+      );
+      if (!res.ok) throw new Error(`Drive create failed: ${res.status}`);
+      const json = await res.json();
+      this.driveFileId = json.id;
     }
+    this.emit('syncComplete', 'saved');
   }
 
   async uploadFileToDrive(file) {
