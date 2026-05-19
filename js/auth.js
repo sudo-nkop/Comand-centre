@@ -20,7 +20,11 @@ class DriveAuth {
   }
 
   init(clientId) {
+    // Always wire up the button so clicking it works even before a clientId is saved
+    this._updateUI(false);
+
     if (!clientId) return;
+
     // Restore saved token
     const saved = localStorage.getItem(TOKEN_KEY);
     const exp = parseInt(localStorage.getItem(TOKEN_EXP_KEY) || '0');
