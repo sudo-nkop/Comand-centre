@@ -136,9 +136,21 @@ class App {
   }
 
   _applyStyle(style) {
-    document.documentElement.setAttribute('data-theme', style || 'ai');
+    const active = style || 'ai';
+    document.documentElement.setAttribute('data-theme', active);
     document.querySelectorAll('.style-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.style === (style || 'ai'));
+      const isActive = btn.dataset.style === active;
+      const color = btn.dataset.color || '#fff';
+      btn.classList.toggle('active', isActive);
+      if (isActive) {
+        btn.style.borderColor = color;
+        btn.style.color = color;
+        btn.style.background = color + '22';
+      } else {
+        btn.style.borderColor = '';
+        btn.style.color = '';
+        btn.style.background = '';
+      }
     });
   }
 

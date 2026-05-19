@@ -6,6 +6,12 @@
   <meta name="theme-color" content="#0d0d1a" />
   <title>Command Centre</title>
   <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    try {
+      var d = JSON.parse(localStorage.getItem('command-centre-data') || '{}');
+      document.documentElement.setAttribute('data-theme', (d.settings && d.settings.style) || 'ai');
+    } catch(e) {}
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -50,14 +56,14 @@
         <div class="style-selector">
           <span class="style-selector-label">Theme</span>
           <div class="style-options">
-            <button class="style-btn active" data-style="ai" title="AI — Dark Purple">
+            <button class="style-btn active" data-style="ai" data-color="#a78bfa" title="AI — Dark Purple">
               <span class="style-swatch" style="background:#7c3aed"></span>AI
             </button>
-            <button class="style-btn" data-style="finance" title="Finance — Light Green">
+            <button class="style-btn" data-style="finance" data-color="#22c55e" title="Finance — Light Green">
               <span class="style-swatch" style="background:#16a34a"></span>Finance
             </button>
-            <button class="style-btn" data-style="content" title="Content — Minimal Dark">
-              <span class="style-swatch" style="background:#d4d4d4"></span>Content
+            <button class="style-btn" data-style="content" data-color="#e5e5e5" title="Content — Minimal Dark">
+              <span class="style-swatch" style="background:#888"></span>Content
             </button>
           </div>
         </div>
