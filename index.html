@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="ai">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -47,6 +47,20 @@
       </nav>
 
       <div class="sidebar-bottom">
+        <div class="style-selector">
+          <span class="style-selector-label">Theme</span>
+          <div class="style-options">
+            <button class="style-btn active" data-style="ai" title="AI — Dark Purple">
+              <span class="style-swatch" style="background:#7c3aed"></span>AI
+            </button>
+            <button class="style-btn" data-style="finance" title="Finance — Light Green">
+              <span class="style-swatch" style="background:#16a34a"></span>Finance
+            </button>
+            <button class="style-btn" data-style="content" title="Content — Minimal Dark">
+              <span class="style-swatch" style="background:#d4d4d4"></span>Content
+            </button>
+          </div>
+        </div>
         <div class="sync-status">
           <span class="sync-dot"></span>
           <span id="sync-status-text">Not connected</span>

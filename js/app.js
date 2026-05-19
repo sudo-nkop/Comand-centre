@@ -29,9 +29,11 @@ class App {
 
   init() {
     store.load();
+    this._applyStyle(store.data.settings.style || 'ai');
     this._setupNav();
     this._setupModal();
     this._setupSyncBtn();
+    this._setupStyleSelector();
 
     const hash = window.location.hash.slice(1);
     if (VIEWS[hash]) currentView = hash;
@@ -130,6 +132,23 @@ class App {
       if (icon) icon.setAttribute('data-lucide', 'refresh-cw');
       if (typeof lucide !== 'undefined') lucide.createIcons();
       this.render();
+    });
+  }
+
+  _applyStyle(style) {
+    document.documentElement.setAttribute('data-theme', style || 'ai');
+    document.querySelectorAll('.style-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.style === (style || 'ai'));
+    });
+  }
+
+  _setupStyleSelector() {
+    document.querySelectorAll('.style-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const style = btn.dataset.style;
+        store.setSetting('style', style);
+        this._applyStyle(style);
+      });
     });
   }
 
