@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="ai">
+<html lang="en" data-theme="ai" data-mode="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,8 +8,11 @@
   <link rel="stylesheet" href="css/styles.css" />
   <script>
     try {
-      var d = JSON.parse(localStorage.getItem('command-centre-data') || '{}');
-      document.documentElement.setAttribute('data-theme', (d.settings && d.settings.style) || 'ai');
+      var _d = JSON.parse(localStorage.getItem('command-centre-data') || '{}');
+      var _s = (_d.settings && _d.settings.style) || 'ai';
+      var _m = (_d.settings && _d.settings.mode)  || 'dark';
+      document.documentElement.setAttribute('data-theme', _s);
+      document.documentElement.setAttribute('data-mode',  _m);
     } catch(e) {}
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -54,15 +57,20 @@
 
       <div class="sidebar-bottom">
         <div class="style-selector">
-          <span class="style-selector-label">Theme</span>
+          <div class="style-selector-header">
+            <span class="style-selector-label">Theme</span>
+            <button class="mode-toggle" id="mode-toggle-btn" title="Switch to light mode">
+              <span data-lucide="sun" id="mode-toggle-icon"></span>
+            </button>
+          </div>
           <div class="style-options">
-            <button class="style-btn active" data-style="ai" data-color="#a78bfa" title="AI — Dark Purple">
+            <button class="style-btn active" data-style="ai" data-color="#a78bfa" title="AI — Cosmic Purple">
               <span class="style-swatch" style="background:#7c3aed"></span>AI
             </button>
-            <button class="style-btn" data-style="finance" data-color="#22c55e" title="Finance — Light Green">
+            <button class="style-btn" data-style="finance" data-color="#22c55e" title="Finance — Fresh Green">
               <span class="style-swatch" style="background:#16a34a"></span>Finance
             </button>
-            <button class="style-btn" data-style="content" data-color="#e5e5e5" title="Content — Minimal Dark">
+            <button class="style-btn" data-style="content" data-color="#b0aba4" title="Content — Editorial">
               <span class="style-swatch" style="background:#888"></span>Content
             </button>
           </div>

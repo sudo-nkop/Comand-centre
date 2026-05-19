@@ -30,10 +30,12 @@ class App {
   init() {
     store.load();
     this._applyStyle(store.data.settings.style || 'ai');
+    this._applyMode(store.data.settings.mode  || 'dark');
     this._setupNav();
     this._setupModal();
     this._setupSyncBtn();
     this._setupStyleSelector();
+    this._setupModeToggle();
 
     const hash = window.location.hash.slice(1);
     if (VIEWS[hash]) currentView = hash;
@@ -162,6 +164,28 @@ class App {
         this._applyStyle(style);
       });
     });
+  }
+
+  _setupModeToggle() {
+    const btn = document.getElementById('mode-toggle-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const next = (store.data.settings.mode || 'dark') === 'dark' ? 'light' : 'dark';
+      store.setSetting('mode', next);
+      this._applyMode(next);
+    });
+  }
+
+  _applyMode(mode) {
+    const m = mode || 'dark';
+    document.documentElement.setAttribute('data-mode', m);
+    const icon = document.getElementById('mode-toggle-icon');
+    const btn  = document.getElementById('mode-toggle-btn');
+    if (icon) {
+      icon.setAttribute('data-lucide', m === 'dark' ? 'sun' : 'moon');
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+    if (btn) btn.title = m === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
   }
 
   _updateTimerWidget() {
