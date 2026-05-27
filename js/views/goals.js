@@ -3,6 +3,14 @@ import { formatDate, formatRelative, escapeHtml, openModal, closeModal, showToas
 
 const CATEGORIES = ['personal', 'work', 'health', 'finance', 'learning', 'other'];
 
+let _clickHandler = null;
+let _changeHandler = null;
+
+export function unmountGoals() {
+  if (_clickHandler) { document.removeEventListener('click', _clickHandler); _clickHandler = null; }
+  if (_changeHandler) { document.removeEventListener('change', _changeHandler); _changeHandler = null; }
+}
+
 export function renderGoals() {
   const { goals } = store.data;
   const active = goals.filter(g => g.progress < 100);
@@ -40,6 +48,9 @@ export function renderGoals() {
 function renderGoalCard(g, done = false) {
   const daysLeft = g.targetDate ? Math.ceil((g.targetDate - Date.now()) / 86400000) : null;
   const isOverdue = daysLeft !== null && daysLeft < 0 && !done;
+  const linkedTasks = (g.linkedTaskIds || [])
+    .map(id => store.data.todos.find(t => t.id === id))
+    .filter(Boolean);
 
   return `
     <div class="goal-card ${done ? 'completed-goal' : ''}">
@@ -74,7 +85,7 @@ function renderGoalCard(g, done = false) {
       ` : ''}
 
       ${g.milestones.length > 0 ? `
-        <div>
+        <div style="margin-bottom:12px">
           <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
             Milestones (${g.milestones.filter(m=>m.completed).length}/${g.milestones.length})
           </div>
@@ -91,8 +102,35 @@ function renderGoalCard(g, done = false) {
         </div>
       ` : ''}
 
+      ${linkedTasks.length > 0 ? `
+        <div style="margin-bottom:12px">
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+            Linked Tasks (${linkedTasks.filter(t=>t.completed).length}/${linkedTasks.length})
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            ${linkedTasks.map(t => `
+              <div class="milestone-item" style="justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+                  <div class="milestone-check ${t.completed?'completed':''}" data-action="toggle-linked-task" data-todo-id="${t.id}">
+                    ${t.completed ? `<i data-lucide="check" style="width:10px;height:10px"></i>` : ''}
+                  </div>
+                  <span style="font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.completed?'text-decoration:line-through;color:var(--text-muted)':''}">${escapeHtml(t.title)}</span>
+                  <span class="badge badge-${t.priority}" style="flex-shrink:0">${t.priority}</span>
+                </div>
+                <button class="btn-icon" style="flex-shrink:0;width:20px;height:20px;color:var(--text-muted)" data-action="unlink-task" data-goal-id="${g.id}" data-todo-id="${t.id}" title="Unlink">
+                  <i data-lucide="x" style="width:12px;height:12px"></i>
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       ${!done ? `
-        <div style="margin-top:12px">
+        <button class="btn btn-secondary" style="width:100%;font-size:0.8rem;margin-bottom:12px" data-action="link-task" data-id="${g.id}">
+          <i data-lucide="paperclip" style="width:13px;height:13px"></i> Link Task
+        </button>
+        <div>
           <label style="font-size:0.75rem;color:var(--text-muted)">Set progress manually</label>
           <input type="range" min="0" max="100" value="${g.progress}" class="progress-slider" data-action="set-progress" data-id="${g.id}" style="width:100%;margin-top:4px;accent-color:var(--accent)">
         </div>
@@ -102,22 +140,16 @@ function renderGoalCard(g, done = false) {
 }
 
 export function mountGoals(rerender) {
+  unmountGoals();
+
   if (typeof lucide !== 'undefined') lucide.createIcons();
 
   document.getElementById('add-goal-btn')?.addEventListener('click', () => openAddGoalModal(rerender));
 
-  document.addEventListener('click', handleGoalClick);
-  document.addEventListener('change', handleGoalChange);
-
-  return () => {
-    document.removeEventListener('click', handleGoalClick);
-    document.removeEventListener('change', handleGoalChange);
-  };
-
-  function handleGoalClick(e) {
+  _clickHandler = function(e) {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
-    const { action, id, goalId, milestoneId } = btn.dataset;
+    const { action, id, goalId, milestoneId, todoId } = btn.dataset;
     if (action === 'edit-goal') openEditGoalModal(id, rerender);
     else if (action === 'delete-goal') {
       if (confirm('Delete this goal?')) { store.deleteGoal(id); rerender(); }
@@ -126,14 +158,26 @@ export function mountGoals(rerender) {
       store.toggleMilestone(goalId, milestoneId);
       rerender();
     }
-  }
+    else if (action === 'link-task') openLinkTaskModal(id, rerender);
+    else if (action === 'toggle-linked-task') {
+      store.toggleTodo(todoId);
+      rerender();
+    }
+    else if (action === 'unlink-task') {
+      store.unlinkTaskFromGoal(goalId, todoId);
+      rerender();
+    }
+  };
 
-  function handleGoalChange(e) {
+  _changeHandler = function(e) {
     const el = e.target.closest('[data-action="set-progress"]');
     if (!el) return;
     store.updateGoal(el.dataset.id, { progress: parseInt(el.value), milestones: store.data.goals.find(g=>g.id===el.dataset.id)?.milestones || [] });
     rerender();
-  }
+  };
+
+  document.addEventListener('click', _clickHandler);
+  document.addEventListener('change', _changeHandler);
 }
 
 function openAddGoalModal(rerender) {
@@ -256,6 +300,48 @@ function openEditGoalModal(id, rerender) {
     closeModal();
     rerender();
     showToast('Goal updated!', 'success');
+  });
+}
+
+function openLinkTaskModal(goalId, rerender) {
+  const goal = store.data.goals.find(g => g.id === goalId);
+  if (!goal) return;
+  const linkedIds = new Set(goal.linkedTaskIds || []);
+  const available = store.data.todos.filter(t => !linkedIds.has(t.id));
+
+  openModal(`
+    <div class="modal-header">
+      <h2 class="modal-title">Link a Task</h2>
+      <button class="btn-icon" onclick="closeModal()"><i data-lucide="x"></i></button>
+    </div>
+    ${available.length === 0 ? `
+      <p style="color:var(--text-muted);text-align:center;padding:24px 0">No tasks available to link.</p>
+    ` : `
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px">Click a task to attach it to this goal.</p>
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto">
+        ${available.map(t => `
+          <button class="link-task-option" data-task-id="${t.id}"
+            style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;cursor:pointer;text-align:left;width:100%;color:var(--text)">
+            <span class="badge badge-${t.priority}" style="flex-shrink:0">${t.priority}</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(t.title)}</span>
+            ${t.completed ? `<span style="font-size:0.75rem;color:var(--green);flex-shrink:0">Done</span>` : ''}
+          </button>
+        `).join('')}
+      </div>
+    `}
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  document.querySelectorAll('.link-task-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      store.linkTaskToGoal(goalId, btn.dataset.taskId);
+      closeModal();
+      rerender();
+      showToast('Task linked!', 'success');
+    });
   });
 }
 
