@@ -152,12 +152,50 @@ function startTimerLoop(rerender) {
     const todo = store.data.todos.find(t => t.id === activeTimer.todoId);
     if (!todo) return;
     const elapsed = Date.now() - activeTimer.startTime;
+
+    if (elapsed >= 3600000) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      const todoId = activeTimer.todoId;
+      store.stopTimer(todoId);
+      rerender();
+      showHourlyPrompt(todoId, rerender);
+      return;
+    }
+
     el.textContent = formatDuration(todo.totalTime + elapsed);
 
     // Update header widget
     const widgetDisplay = document.getElementById('widget-timer-display');
     if (widgetDisplay) widgetDisplay.textContent = formatDuration(elapsed);
   }, 1000);
+}
+
+function showHourlyPrompt(todoId, rerender) {
+  const todo = store.data.todos.find(t => t.id === todoId);
+  const taskName = todo ? escapeHtml(todo.title) : 'this task';
+  openModal(`
+    <div class="modal-header">
+      <h2 class="modal-title">1 Hour Reached</h2>
+    </div>
+    <p style="margin-bottom:20px;color:var(--text-muted)">
+      You've been working on <strong style="color:var(--text)">${taskName}</strong> for 1 hour. Keep going?
+    </p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" id="hourly-stop-btn">Stop Timer</button>
+      <button class="btn btn-primary" id="hourly-continue-btn">Continue</button>
+    </div>
+  `);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  document.getElementById('hourly-continue-btn')?.addEventListener('click', () => {
+    closeModal();
+    startTimerUI(todoId, rerender);
+  });
+
+  document.getElementById('hourly-stop-btn')?.addEventListener('click', () => {
+    closeModal();
+  });
 }
 
 function startTimerUI(todoId, rerender) {
