@@ -4,7 +4,7 @@ import { showToast, formatDuration } from './utils.js';
 
 import { renderDashboard, mountDashboard } from './views/dashboard.js';
 import { renderTodos, mountTodos, unmountTodos } from './views/todos.js';
-import { renderGoals, mountGoals } from './views/goals.js';
+import { renderGoals, mountGoals, unmountGoals } from './views/goals.js';
 import { renderNotes, mountNotes } from './views/notes.js';
 import { renderStats, mountStats, unmountStats } from './views/stats.js';
 import { renderStorage, mountStorage } from './views/storage.js';
@@ -12,7 +12,7 @@ import { renderStorage, mountStorage } from './views/storage.js';
 const VIEWS = {
   dashboard: { label: 'Dashboard', render: renderDashboard, mount: mountDashboard },
   todos:     { label: 'To-Do List', render: renderTodos,     mount: mountTodos,     unmount: unmountTodos },
-  goals:     { label: 'Goals',      render: renderGoals,     mount: mountGoals },
+  goals:     { label: 'Goals',      render: renderGoals,     mount: mountGoals,     unmount: unmountGoals },
   notes:     { label: 'Notes',      render: renderNotes,     mount: mountNotes },
   stats:     { label: 'Stats Board', render: renderStats,    mount: mountStats,     unmount: unmountStats },
   storage:   { label: 'Storage',    render: renderStorage,   mount: mountStorage }

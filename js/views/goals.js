@@ -3,6 +3,14 @@ import { formatDate, formatRelative, escapeHtml, openModal, closeModal, showToas
 
 const CATEGORIES = ['personal', 'work', 'health', 'finance', 'learning', 'other'];
 
+let _clickHandler = null;
+let _changeHandler = null;
+
+export function unmountGoals() {
+  if (_clickHandler) { document.removeEventListener('click', _clickHandler); _clickHandler = null; }
+  if (_changeHandler) { document.removeEventListener('change', _changeHandler); _changeHandler = null; }
+}
+
 export function renderGoals() {
   const { goals } = store.data;
   const active = goals.filter(g => g.progress < 100);
@@ -132,19 +140,13 @@ function renderGoalCard(g, done = false) {
 }
 
 export function mountGoals(rerender) {
+  unmountGoals();
+
   if (typeof lucide !== 'undefined') lucide.createIcons();
 
   document.getElementById('add-goal-btn')?.addEventListener('click', () => openAddGoalModal(rerender));
 
-  document.addEventListener('click', handleGoalClick);
-  document.addEventListener('change', handleGoalChange);
-
-  return () => {
-    document.removeEventListener('click', handleGoalClick);
-    document.removeEventListener('change', handleGoalChange);
-  };
-
-  function handleGoalClick(e) {
+  _clickHandler = function(e) {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const { action, id, goalId, milestoneId, todoId } = btn.dataset;
@@ -165,14 +167,17 @@ export function mountGoals(rerender) {
       store.unlinkTaskFromGoal(goalId, todoId);
       rerender();
     }
-  }
+  };
 
-  function handleGoalChange(e) {
+  _changeHandler = function(e) {
     const el = e.target.closest('[data-action="set-progress"]');
     if (!el) return;
     store.updateGoal(el.dataset.id, { progress: parseInt(el.value), milestones: store.data.goals.find(g=>g.id===el.dataset.id)?.milestones || [] });
     rerender();
-  }
+  };
+
+  document.addEventListener('click', _clickHandler);
+  document.addEventListener('change', _changeHandler);
 }
 
 function openAddGoalModal(rerender) {
