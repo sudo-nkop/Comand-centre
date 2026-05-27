@@ -136,6 +136,7 @@ class Store {
       targetDate: fields.targetDate || null,
       progress: 0,
       milestones: (fields.milestones || []).map(m => ({ id: generateId(), title: m, completed: false })),
+      linkedTaskIds: [],
       createdAt: Date.now()
     };
     this.data.goals.unshift(goal);
@@ -166,6 +167,21 @@ class Store {
     if (!goal || !goal.milestones.length) return;
     const done = goal.milestones.filter(m => m.completed).length;
     goal.progress = Math.round((done / goal.milestones.length) * 100);
+  }
+
+  linkTaskToGoal(goalId, todoId) {
+    const goal = this.data.goals.find(g => g.id === goalId);
+    if (!goal) return;
+    if (!goal.linkedTaskIds) goal.linkedTaskIds = [];
+    if (!goal.linkedTaskIds.includes(todoId)) goal.linkedTaskIds.push(todoId);
+    this.save();
+  }
+
+  unlinkTaskFromGoal(goalId, todoId) {
+    const goal = this.data.goals.find(g => g.id === goalId);
+    if (!goal) return;
+    goal.linkedTaskIds = (goal.linkedTaskIds || []).filter(id => id !== todoId);
+    this.save();
   }
 
   deleteGoal(id) {
