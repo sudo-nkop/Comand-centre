@@ -2,12 +2,16 @@ import { generateId, showToast, debounce } from './utils.js';
 
 const STORAGE_KEY = 'command-centre-data';
 const DRIVE_FILE_NAME = 'command-centre-data.json';
+const SAT_PREP_FILE_NAME = 'sat-prep-stats.json';
+const OPERA_NOTES_FILE_NAME = 'opera-notes.json';
 
 class Store {
   constructor() {
     this.listeners = {};
     this.data = this._defaultData();
     this.driveFileId = null;
+    this.satPrepFileId = null;
+    this.operaNotesFileId = null;
     this.syncDebounced = debounce(() => this._syncToDrive(), 4000);
   }
 
@@ -18,7 +22,8 @@ class Store {
       notes: [],
       files: [],
       activeTimer: null, // { todoId, startTime }
-      settings: { theme: 'dark', clientId: '' }
+      settings: { theme: 'dark', clientId: '' },
+      satPrep: { stats: { answered: 0, correct: 0, streak: 0, lastDay: null }, history: [], lastSynced: null }
     };
   }
 
@@ -196,12 +201,14 @@ class Store {
       title: fields.title || 'Untitled Note',
       content: fields.content || '',
       tags: fields.tags || [],
+      source: fields.source || null,
       pinned: false,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
     this.data.notes.unshift(note);
     this.save();
+    this._emitNoteChange();
     return note;
   }
 
@@ -210,17 +217,23 @@ class Store {
     if (idx === -1) return;
     this.data.notes[idx] = { ...this.data.notes[idx], ...fields, updatedAt: Date.now() };
     this.save();
+    this._emitNoteChange();
     return this.data.notes[idx];
   }
 
   deleteNote(id) {
     this.data.notes = this.data.notes.filter(n => n.id !== id);
     this.save();
+    this._emitNoteChange();
   }
 
   togglePinNote(id) {
     const note = this.data.notes.find(n => n.id === id);
-    if (note) { note.pinned = !note.pinned; this.save(); }
+    if (note) { note.pinned = !note.pinned; this.save(); this._emitNoteChange(); }
+  }
+
+  _emitNoteChange() {
+    window.dispatchEvent(new CustomEvent('cc:storeChange', { detail: { notes: this.data.notes } }));
   }
 
   // ─── Files ────────────────────────────────────────────────────────────────
@@ -269,9 +282,73 @@ class Store {
         await this._syncToDrive();
         this.emit('syncComplete', 'created');
       }
+
+      // Pull connected-app data in parallel (non-blocking)
+      await Promise.all([
+        this.syncSatPrep(token),
+        this.syncOperaNotes(token)
+      ]);
     } catch (e) {
       console.warn('Drive sync error:', e);
       showToast('Drive sync failed', 'error');
+    }
+  }
+
+  async syncSatPrep(token) {
+    try {
+      const search = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='${SAT_PREP_FILE_NAME}' and trashed=false&spaces=drive&fields=files(id,modifiedTime)`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const { files } = await search.json();
+      if (!files || files.length === 0) return;
+      this.satPrepFileId = files[0].id;
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${this.satPrepFileId}?alt=media`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const remote = await res.json();
+      if (remote.stats) {
+        this.data.satPrep = {
+          stats: remote.stats,
+          history: remote.history || [],
+          lastSynced: Date.now()
+        };
+        this.save();
+      }
+    } catch (e) {
+      console.warn('SAT prep sync error:', e);
+    }
+  }
+
+  async syncOperaNotes(token) {
+    try {
+      const search = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='${OPERA_NOTES_FILE_NAME}' and trashed=false&spaces=drive&fields=files(id,modifiedTime)`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const { files } = await search.json();
+      if (!files || files.length === 0) return;
+      this.operaNotesFileId = files[0].id;
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${this.operaNotesFileId}?alt=media`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const remote = await res.json();
+      if (!remote.notes || !remote.notes.length) return;
+
+      // Merge opera notes into main notes array (union by ID, newer wins)
+      const localMap = Object.fromEntries(this.data.notes.map(n => [n.id, n]));
+      for (const n of remote.notes) {
+        const local = localMap[n.id];
+        if (!local || (n.updatedAt || n.createdAt || 0) > (local.updatedAt || local.createdAt || 0)) {
+          localMap[n.id] = { ...n, source: 'opera' };
+        }
+      }
+      this.data.notes = Object.values(localMap).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      this.save();
+    } catch (e) {
+      console.warn('Opera notes sync error:', e);
     }
   }
 
@@ -292,6 +369,10 @@ class Store {
       this.data[key] = Object.values(merged).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     });
     if (remote.settings) this.data.settings = { ...this.data.settings, ...remote.settings, clientId: this.data.settings.clientId };
+    // satPrep is managed separately via syncSatPrep; preserve local copy unless remote has newer lastSynced
+    if (remote.satPrep && (remote.satPrep.lastSynced || 0) > (this.data.satPrep.lastSynced || 0)) {
+      this.data.satPrep = remote.satPrep;
+    }
   }
 
   async _syncToDrive() {

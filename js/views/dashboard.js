@@ -2,7 +2,7 @@ import { store } from '../store.js';
 import { formatDuration, formatRelative, formatDate, escapeHtml } from '../utils.js';
 
 export function renderDashboard() {
-  const { todos, goals, notes } = store.data;
+  const { todos, goals, notes, satPrep } = store.data;
   const today = new Date(); today.setHours(0,0,0,0);
   const todayTs = today.getTime();
 
@@ -12,6 +12,11 @@ export function renderDashboard() {
     const todaySessions = (t.timerSessions || []).filter(s => s.start >= todayTs);
     return acc + todaySessions.reduce((a, s) => a + (s.duration || 0), 0);
   }, 0);
+
+  // Connected Apps data
+  const satStats = satPrep?.stats || {};
+  const satAccuracy = satStats.answered ? Math.round((satStats.correct / satStats.answered) * 100) : null;
+  const operaNotesCount = notes.filter(n => n.source === 'opera').length;
 
   // Active timer addition
   const activeTimer = store.data.activeTimer;
@@ -48,6 +53,16 @@ export function renderDashboard() {
         <div class="stat-label">Notes</div>
         <div class="stat-value" style="color:var(--yellow)">${notes.length}</div>
         <div class="stat-trend">${notes.filter(n=>n.pinned).length} pinned</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">SAT Prep</div>
+        <div class="stat-value" style="color:var(--green)">${satAccuracy !== null ? satAccuracy + '%' : '--'}</div>
+        <div class="stat-trend">${satStats.streak ? satStats.streak + ' day streak' : satAccuracy !== null ? satStats.answered + ' answered' : 'Not connected'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Opera Notes</div>
+        <div class="stat-value" style="color:var(--cyan)">${operaNotesCount}</div>
+        <div class="stat-trend">${operaNotesCount > 0 ? 'from sidebar' : 'None synced yet'}</div>
       </div>
     </div>
 

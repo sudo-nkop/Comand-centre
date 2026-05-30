@@ -1,10 +1,10 @@
 import { store } from '../store.js';
-import { formatDuration, getLastNDays, getDayLabel, startOfDay } from '../utils.js';
+import { formatDuration, formatRelative, getLastNDays, getDayLabel, startOfDay } from '../utils.js';
 
 let charts = {};
 
 export function renderStats() {
-  const { todos, goals } = store.data;
+  const { todos, goals, satPrep } = store.data;
 
   const total = todos.length;
   const completed = todos.filter(t => t.completed).length;
@@ -17,6 +17,54 @@ export function renderStats() {
   // Today's completions
   const todayTs = startOfDay();
   const todayDone = todos.filter(t => t.completed && t.completedAt >= todayTs).length;
+
+  // SAT Prep stats
+  const satStats = satPrep?.stats || {};
+  const satHistory = satPrep?.history || [];
+  const satAccuracy = satStats.answered ? Math.round((satStats.correct / satStats.answered) * 100) : null;
+  const hasSatData = satHistory.length > 0;
+
+  const satSection = hasSatData ? `
+    <div class="section-header" style="margin-top:32px;margin-bottom:16px">
+      <h2 class="section-title" style="font-size:1rem">SAT Prep</h2>
+      ${satPrep.lastSynced ? `<span style="font-size:0.75rem;color:var(--text-muted)">Last synced ${formatRelative(satPrep.lastSynced)}</span>` : ''}
+    </div>
+    <div class="stats-grid" style="margin-bottom:24px">
+      <div class="stat-card">
+        <div class="stat-label">Accuracy</div>
+        <div class="stat-value" style="color:var(--green)">${satAccuracy}%</div>
+        <div class="stat-trend">${satStats.correct} / ${satStats.answered} correct</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Sessions</div>
+        <div class="stat-value" style="color:var(--cyan)">${satHistory.length}</div>
+        <div class="stat-trend">practice sessions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">SAT Streak</div>
+        <div class="stat-value" style="color:var(--yellow)">${satStats.streak || 0}</div>
+        <div class="stat-trend">days in a row</div>
+      </div>
+    </div>
+    <div class="charts-grid" style="margin-bottom:32px">
+      <div class="chart-card">
+        <div class="chart-title">SAT Accuracy (Last 7 Sessions)</div>
+        <canvas id="sat-accuracy-chart" height="200"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Recent Session Scores</div>
+        <canvas id="sat-scores-chart" height="200"></canvas>
+      </div>
+    </div>
+  ` : `
+    <div class="section-header" style="margin-top:32px;margin-bottom:16px">
+      <h2 class="section-title" style="font-size:1rem">SAT Prep</h2>
+    </div>
+    <div class="empty-state" style="padding:32px;margin-bottom:32px">
+      <i data-lucide="book-open" style="width:36px;height:36px;color:var(--border-bright)"></i>
+      <span>No SAT data yet — connect Drive in the SAT Prep app to sync stats here.</span>
+    </div>
+  `;
 
   return `
     <div class="section-header"><h2 class="section-title">Stats Board</h2></div>
@@ -72,11 +120,13 @@ export function renderStats() {
         <canvas id="goals-chart" height="200"></canvas>
       </div>
     </div>
+
+    ${satSection}
   `;
 }
 
 export function mountStats() {
-  const { todos, goals } = store.data;
+  const { todos, goals, satPrep } = store.data;
 
   if (typeof Chart === 'undefined') {
     console.warn('Chart.js not loaded');
@@ -220,6 +270,74 @@ export function mountStats() {
       }
     }
   });
+
+  // ─── SAT Prep charts ──────────────────────────────────────────────────────
+  const satHistory = satPrep?.history || [];
+  if (satHistory.length && document.getElementById('sat-accuracy-chart')) {
+    const recent7 = satHistory.slice(0, 7).reverse();
+    const satLabels = recent7.map((s, i) => {
+      const d = new Date(s.timestamp || s.when || 0);
+      return `${d.getMonth()+1}/${d.getDate()}`;
+    });
+    const satAccData = recent7.map(s => s.total ? Math.round((s.score / s.total) * 100) : 0);
+    const satScoreData = recent7.map(s => s.score || 0);
+    const satTotalData = recent7.map(s => s.total || 0);
+
+    charts.satAccuracy = new Chart(document.getElementById('sat-accuracy-chart'), {
+      type: 'line',
+      data: {
+        labels: satLabels,
+        datasets: [{
+          label: 'Accuracy %',
+          data: satAccData,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,0.1)',
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: '#10b981',
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: gridColor }, ticks: { font: { size: 11 } } },
+          y: { grid: { color: gridColor }, beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
+        }
+      }
+    });
+
+    charts.satScores = new Chart(document.getElementById('sat-scores-chart'), {
+      type: 'bar',
+      data: {
+        labels: satLabels,
+        datasets: [{
+          label: 'Correct',
+          data: satScoreData,
+          backgroundColor: 'rgba(16,185,129,0.6)',
+          borderColor: '#10b981',
+          borderWidth: 1,
+          borderRadius: 4
+        }, {
+          label: 'Total',
+          data: satTotalData,
+          backgroundColor: 'rgba(148,163,184,0.2)',
+          borderColor: 'rgba(148,163,184,0.5)',
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } } },
+        scales: {
+          x: { grid: { color: gridColor }, ticks: { font: { size: 11 } } },
+          y: { grid: { color: gridColor }, beginAtZero: true, ticks: { stepSize: 1 } }
+        }
+      }
+    });
+  }
 }
 
 export function unmountStats() {
