@@ -1,6 +1,12 @@
 import { store } from '../store.js';
 import { formatDuration, formatRelative, formatDate, escapeHtml } from '../utils.js';
 
+let _dashTimerInterval = null;
+
+export function unmountDashboard() {
+  if (_dashTimerInterval) { clearInterval(_dashTimerInterval); _dashTimerInterval = null; }
+}
+
 export function renderDashboard() {
   const { todos, goals, notes } = store.data;
   const today = new Date(); today.setHours(0,0,0,0);
@@ -60,16 +66,23 @@ export function renderDashboard() {
         </div>
         ${pendingTodos.length === 0 ? `<div class="empty-state" style="padding:20px"><i data-lucide="check-circle" style="width:32px;height:32px;color:var(--border-bright)"></i><span style="font-size:0.85rem">No pending tasks</span></div>` : ''}
         <div class="todo-list">
-          ${pendingTodos.map(t => `
+          ${pendingTodos.map(t => {
+            const isActive = activeTimer?.todoId === t.id;
+            const elapsed = isActive ? Date.now() - activeTimer.startTime : 0;
+            const totalDisplay = t.totalTime + elapsed;
+            return `
             <div class="todo-item" style="padding:10px 12px">
               <div class="todo-checkbox ${t.completed ? 'checked' : ''}" onclick="window._store.toggleTodo('${t.id}');window._app.render()">
                 ${t.completed ? `<i data-lucide="check" style="width:12px;height:12px"></i>` : ''}
               </div>
               <div class="todo-title" style="${t.completed ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${escapeHtml(t.title)}</div>
               <span class="badge badge-${t.priority}">${t.priority}</span>
-              ${t.totalTime > 0 ? `<span class="todo-timer">${formatDuration(t.totalTime)}</span>` : ''}
-            </div>
-          `).join('')}
+              ${totalDisplay > 0 || isActive ? `<span class="todo-timer ${isActive ? 'running' : ''}" id="dash-timer-${t.id}">${formatDuration(totalDisplay)}</span>` : ''}
+              <button class="btn-icon timer-btn ${isActive ? 'running' : ''}" title="${isActive ? 'Stop timer' : 'Start timer'}" data-action="dash-timer" data-id="${t.id}" style="flex-shrink:0">
+                <i data-lucide="${isActive ? 'square' : 'play'}"></i>
+              </button>
+            </div>`;
+          }).join('')}
         </div>
       </div>
 
@@ -115,7 +128,36 @@ export function renderDashboard() {
   `;
 }
 
-export function mountDashboard() {
+export function mountDashboard(rerender) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
   window._store = store;
+
+  document.querySelector('.todo-list')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action="dash-timer"]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const { activeTimer } = store.data;
+    if (activeTimer?.todoId === id) {
+      store.stopTimer(id);
+    } else {
+      store.startTimer(id);
+    }
+    rerender();
+  });
+
+  _startDashTimerLoop(rerender);
+}
+
+function _startDashTimerLoop(rerender) {
+  if (_dashTimerInterval) clearInterval(_dashTimerInterval);
+  const { activeTimer } = store.data;
+  if (!activeTimer) return;
+
+  _dashTimerInterval = setInterval(() => {
+    const el = document.getElementById(`dash-timer-${activeTimer.todoId}`);
+    if (!el) return;
+    const todo = store.data.todos.find(t => t.id === activeTimer.todoId);
+    if (!todo) return;
+    el.textContent = formatDuration(todo.totalTime + (Date.now() - activeTimer.startTime));
+  }, 1000);
 }

@@ -1,5 +1,7 @@
 import { store } from '../store.js';
-import { formatDate, formatRelative, escapeHtml, openModal, closeModal, showToast, generateId } from '../utils.js';
+import { formatDate, formatRelative, escapeHtml, openModal, closeModal, showToast, generateId, formatDuration } from '../utils.js';
+
+let _goalsTimerInterval = null;
 
 const CATEGORIES = ['personal', 'work', 'health', 'finance', 'learning', 'other'];
 
@@ -9,6 +11,7 @@ let _changeHandler = null;
 export function unmountGoals() {
   if (_clickHandler) { document.removeEventListener('click', _clickHandler); _clickHandler = null; }
   if (_changeHandler) { document.removeEventListener('change', _changeHandler); _changeHandler = null; }
+  if (_goalsTimerInterval) { clearInterval(_goalsTimerInterval); _goalsTimerInterval = null; }
 }
 
 export function renderGoals() {
@@ -51,6 +54,7 @@ function renderGoalCard(g, done = false) {
   const linkedTasks = (g.linkedTaskIds || [])
     .map(id => store.data.todos.find(t => t.id === id))
     .filter(Boolean);
+  const { activeTimer } = store.data;
 
   return `
     <div class="goal-card ${done ? 'completed-goal' : ''}">
@@ -108,7 +112,11 @@ function renderGoalCard(g, done = false) {
             Linked Tasks (${linkedTasks.filter(t=>t.completed).length}/${linkedTasks.length})
           </div>
           <div style="display:flex;flex-direction:column;gap:4px">
-            ${linkedTasks.map(t => `
+            ${linkedTasks.map(t => {
+              const isActive = activeTimer?.todoId === t.id;
+              const elapsed = isActive ? Date.now() - activeTimer.startTime : 0;
+              const totalDisplay = t.totalTime + elapsed;
+              return `
               <div class="milestone-item" style="justify-content:space-between">
                 <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
                   <div class="milestone-check ${t.completed?'completed':''}" data-action="toggle-linked-task" data-todo-id="${t.id}">
@@ -116,12 +124,19 @@ function renderGoalCard(g, done = false) {
                   </div>
                   <span style="font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.completed?'text-decoration:line-through;color:var(--text-muted)':''}">${escapeHtml(t.title)}</span>
                   <span class="badge badge-${t.priority}" style="flex-shrink:0">${t.priority}</span>
+                  ${totalDisplay > 0 || isActive ? `<span class="todo-timer ${isActive?'running':''}" id="goal-timer-${t.id}" style="flex-shrink:0;font-size:0.75rem">${formatDuration(totalDisplay)}</span>` : ''}
                 </div>
-                <button class="btn-icon" style="flex-shrink:0;width:20px;height:20px;color:var(--text-muted)" data-action="unlink-task" data-goal-id="${g.id}" data-todo-id="${t.id}" title="Unlink">
-                  <i data-lucide="x" style="width:12px;height:12px"></i>
-                </button>
-              </div>
-            `).join('')}
+                <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+                  ${!t.completed ? `
+                  <button class="btn-icon timer-btn ${isActive?'running':''}" style="width:20px;height:20px" title="${isActive?'Stop timer':'Start timer'}" data-action="goal-timer" data-todo-id="${t.id}">
+                    <i data-lucide="${isActive?'square':'play'}" style="width:12px;height:12px"></i>
+                  </button>` : ''}
+                  <button class="btn-icon" style="width:20px;height:20px;color:var(--text-muted)" data-action="unlink-task" data-goal-id="${g.id}" data-todo-id="${t.id}" title="Unlink">
+                    <i data-lucide="x" style="width:12px;height:12px"></i>
+                  </button>
+                </div>
+              </div>`;
+            }).join('')}
           </div>
         </div>
       ` : ''}
@@ -167,6 +182,12 @@ export function mountGoals(rerender) {
       store.unlinkTaskFromGoal(goalId, todoId);
       rerender();
     }
+    else if (action === 'goal-timer') {
+      const { activeTimer } = store.data;
+      if (activeTimer?.todoId === todoId) store.stopTimer(todoId);
+      else store.startTimer(todoId);
+      rerender();
+    }
   };
 
   _changeHandler = function(e) {
@@ -178,6 +199,22 @@ export function mountGoals(rerender) {
 
   document.addEventListener('click', _clickHandler);
   document.addEventListener('change', _changeHandler);
+
+  _startGoalsTimerLoop();
+}
+
+function _startGoalsTimerLoop() {
+  if (_goalsTimerInterval) clearInterval(_goalsTimerInterval);
+  const { activeTimer } = store.data;
+  if (!activeTimer) return;
+
+  _goalsTimerInterval = setInterval(() => {
+    const el = document.getElementById(`goal-timer-${activeTimer.todoId}`);
+    if (!el) return;
+    const todo = store.data.todos.find(t => t.id === activeTimer.todoId);
+    if (!todo) return;
+    el.textContent = formatDuration(todo.totalTime + (Date.now() - activeTimer.startTime));
+  }, 1000);
 }
 
 function openAddGoalModal(rerender) {
