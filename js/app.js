@@ -2,7 +2,7 @@ import { store } from './store.js';
 import { driveAuth } from './auth.js';
 import { showToast, formatDuration } from './utils.js';
 
-import { renderDashboard, mountDashboard } from './views/dashboard.js';
+import { renderDashboard, mountDashboard, unmountDashboard } from './views/dashboard.js';
 import { renderTodos, mountTodos, unmountTodos } from './views/todos.js';
 import { renderGoals, mountGoals, unmountGoals } from './views/goals.js';
 import { renderNotes, mountNotes } from './views/notes.js';
@@ -10,7 +10,7 @@ import { renderStats, mountStats, unmountStats } from './views/stats.js';
 import { renderStorage, mountStorage } from './views/storage.js';
 
 const VIEWS = {
-  dashboard: { label: 'Dashboard', render: renderDashboard, mount: mountDashboard },
+  dashboard: { label: 'Dashboard', render: renderDashboard, mount: mountDashboard, unmount: unmountDashboard },
   todos:     { label: 'To-Do List', render: renderTodos,     mount: mountTodos,     unmount: unmountTodos },
   goals:     { label: 'Goals',      render: renderGoals,     mount: mountGoals,     unmount: unmountGoals },
   notes:     { label: 'Notes',      render: renderNotes,     mount: mountNotes },
